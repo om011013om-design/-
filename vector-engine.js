@@ -192,7 +192,43 @@ function showProcessing() {
 // ============================================
 // محرك تحويل الفيكتور الحقيقي (ImageTracer.js)
 // ============================================
+// ============================================
+// محرك تحويل الفيكتور الحقيقي (مع فلتر التنظيف المسبق)
+// ============================================
 function convertToVector(img) {
+    // 1. إنشاء مساحة عمل مخفية (Canvas) لتنظيف الصورة قبل الفيكتور
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    ctx.drawImage(img, 0, 0);
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    const thresholdLevel = settings.threshold; // سحب قيمة الحساسية من واجهة الموقع
+
+    // 2. تطبيق فلتر الأبيض والأسود (عزل النص عن الخلفية زي ما البوت بيعمل)
+    for (let i = 0; i < data.length; i += 4) {
+        // حساب درجة سطوع البيكسل
+        const brightness = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
+        
+        let colorVal;
+        if (settings.colorScheme === 'whiteOnBlack') {
+            // نص أبيض على خلفية سوداء (زي نتيجة البوت بتاع صديقك)
+            colorVal = brightness < thresholdLevel ? 255 : 0; 
+        } else {
+            // نص أسود على خلفية بيضاء
+            colorVal = brightness < thresholdLevel ? 0 : 255; 
+        }
+
+        data[i] = colorVal;     // R
+        data[i+1] = colorVal;   // G
+        data[i+2] = colorVal;   // B
+        // الشفافية تفضل زي ما هي
+    }
+    ctx.putImageData(imageData, 0, 0);
+
+    // 3. إعدادات مكتبة الفيكتور
     let detailPrecision = 1; 
     if (settings.detailLevel === 'ultra') detailPrecision = 0.1;
     else if (settings.detailLevel === 'high') detailPrecision = 0.5;
@@ -202,17 +238,19 @@ function convertToVector(img) {
     const options = {
         ltres: detailPrecision,
         qtres: detailPrecision,
-        pathomit: 20,
+        pathomit: 10,
         colorsampling: 0,
-        numberofcolors: 2,
+        numberofcolors: 2, // إجبار المكتبة على لونين فقط
         mincolorratio: 0,
-        colorquantcycles: 3,
-        blurradius: 1,
-        blurdelta: 20
+        colorquantcycles: 1,
+        blurradius: 0, // إيقاف التنعيم لأننا نظفنا الصورة يدوياً
+        blurdelta: 0,
+        viewbox: true  // السر هنا! هذا الأمر يمنع قص الصورة والزووم الغريب
     };
 
+    // 4. إرسال الصورة المنظفة للمكتبة
     ImageTracer.imageToSVG(
-        img.src,
+        canvas.toDataURL('image/png'), // نرسل الصورة بعد التنظيف وليس الأصلية
         function(svgString) {
             currentSVG = svgString;
             showResult();
