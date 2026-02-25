@@ -1,7 +1,7 @@
 /**
  * VectorMagic Pro - محرك تحويل الصور إلى فيكتور
- * تم تصميمه بواسطة الأستاذ عمر سنجق
- * @version 2.0.0
+ * تم تصميمه بواسطة الأستاذ عمر السيد
+ * @version 3.0.0 (AI Powered - Hardcoded Keys)
  */
 
 // ============================================
@@ -144,43 +144,13 @@ function processImage(file) {
         
         const img = new Image();
         img.onload = function() {
-            simulateProgress(() => {
-                convertToVector(img);
-            });
+            document.getElementById('progressFill').style.width = '30%';
+            document.getElementById('progressPercent').textContent = '30%';
+            convertToVector(img);
         };
         img.src = e.target.result;
     };
     reader.readAsDataURL(file);
-}
-
-// ============================================
-// محاكاة شريط التقدم
-// ============================================
-function simulateProgress(callback) {
-    let progress = 0;
-    const steps = [
-        { progress: 20, status: 'تحليل الصورة...' },
-        { progress: 50, status: 'تتبع الحواف...' },
-        { progress: 80, status: 'إنشاء المسارات...' },
-        { progress: 95, status: 'تنعيم الفيكتور...' }
-    ];
-    
-    let stepIndex = 0;
-    const interval = setInterval(() => {
-        if (stepIndex < steps.length) {
-            progress = steps[stepIndex].progress;
-            document.getElementById('progressFill').style.width = progress + '%';
-            document.getElementById('progressPercent').textContent = progress + '%';
-            document.getElementById('progressStatus').textContent = steps[stepIndex].status;
-            stepIndex++;
-        } else {
-            clearInterval(interval);
-            document.getElementById('progressFill').style.width = '100%';
-            document.getElementById('progressPercent').textContent = '100%';
-            document.getElementById('progressStatus').textContent = 'اكتمل!';
-            setTimeout(callback, 300);
-        }
-    }, 400);
 }
 
 function showProcessing() {
@@ -190,13 +160,16 @@ function showProcessing() {
 }
 
 // ============================================
-// محرك تحويل الفيكتور الحقيقي (ImageTracer.js)
+// محرك التحويل المزدوج (تنظيف محلي + API خارجي)
 // ============================================
-// ============================================
-// محرك تحويل الفيكتور الحقيقي (مع فلتر التنظيف المسبق)
-// ============================================
-function convertToVector(img) {
-    // 1. إنشاء مساحة عمل مخفية (Canvas) لتنظيف الصورة قبل الفيكتور
+async function convertToVector(img) {
+    // تم دمج المفاتيح مباشرة في الكود هنا
+    const apiKey = 'vkeyvg9yiiely8i';
+    const apiSecret = 'knckq2ssuv32cjhj113n86ommn6seombg4iqcddgb5b5flinpksp';
+
+    document.getElementById('progressStatus').textContent = 'جاري عزل الخلفية وتنظيف الخطوط...';
+
+    // 1. التنظيف المحلي وعزل الألوان
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     canvas.width = img.width;
@@ -205,58 +178,64 @@ function convertToVector(img) {
 
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
-    const thresholdLevel = settings.threshold; // سحب قيمة الحساسية من واجهة الموقع
+    const thresholdLevel = settings.threshold;
 
-    // 2. تطبيق فلتر الأبيض والأسود (عزل النص عن الخلفية زي ما البوت بيعمل)
     for (let i = 0; i < data.length; i += 4) {
-        // حساب درجة سطوع البيكسل
         const brightness = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
-        
         let colorVal;
         if (settings.colorScheme === 'whiteOnBlack') {
-            // نص أبيض على خلفية سوداء (زي نتيجة البوت بتاع صديقك)
             colorVal = brightness < thresholdLevel ? 255 : 0; 
         } else {
-            // نص أسود على خلفية بيضاء
             colorVal = brightness < thresholdLevel ? 0 : 255; 
         }
-
-        data[i] = colorVal;     // R
-        data[i+1] = colorVal;   // G
-        data[i+2] = colorVal;   // B
-        // الشفافية تفضل زي ما هي
+        data[i] = colorVal;
+        data[i+1] = colorVal;
+        data[i+2] = colorVal;
     }
     ctx.putImageData(imageData, 0, 0);
 
-    // 3. إعدادات مكتبة الفيكتور
-    let detailPrecision = 1; 
-    if (settings.detailLevel === 'ultra') detailPrecision = 0.1;
-    else if (settings.detailLevel === 'high') detailPrecision = 0.5;
-    else if (settings.detailLevel === 'medium') detailPrecision = 1;
-    else detailPrecision = 5;
+    document.getElementById('progressFill').style.width = '60%';
+    document.getElementById('progressPercent').textContent = '60%';
+    document.getElementById('progressStatus').textContent = 'جاري الإرسال لسيرفرات الذكاء الاصطناعي...';
 
-    const options = {
-        ltres: detailPrecision,
-        qtres: detailPrecision,
-        pathomit: 10,
-        colorsampling: 0,
-        numberofcolors: 2, // إجبار المكتبة على لونين فقط
-        mincolorratio: 0,
-        colorquantcycles: 1,
-        blurradius: 0, // إيقاف التنعيم لأننا نظفنا الصورة يدوياً
-        blurdelta: 0,
-        viewbox: true  // السر هنا! هذا الأمر يمنع قص الصورة والزووم الغريب
-    };
+    // 2. إرسال الصورة النظيفة إلى السيرفر
+    canvas.toBlob(async function(blob) {
+        const formData = new FormData();
+        formData.append('image', blob, 'clean_image.png');
 
-    // 4. إرسال الصورة المنظفة للمكتبة
-    ImageTracer.imageToSVG(
-        canvas.toDataURL('image/png'), // نرسل الصورة بعد التنظيف وليس الأصلية
-        function(svgString) {
-            currentSVG = svgString;
-            showResult();
-        },
-        options
-    );
+        try {
+            // نستخدم Proxy لتخطي حماية المتصفح (CORS) والسماح بالاتصال
+            const proxyUrl = 'https://corsproxy.io/?';
+            const targetUrl = 'https://vectorizer.ai/api/v1/vectorize';
+            
+            const response = await fetch(proxyUrl + encodeURIComponent(targetUrl), {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Basic ' + btoa(apiKey + ':' + apiSecret)
+                },
+                body: formData
+            });
+
+            if (response.ok) {
+                document.getElementById('progressFill').style.width = '100%';
+                document.getElementById('progressPercent').textContent = '100%';
+                document.getElementById('progressStatus').textContent = 'تم استلام الفيكتور بنجاح!';
+                
+                const svgString = await response.text();
+                currentSVG = svgString;
+                setTimeout(showResult, 500);
+            } else {
+                const errorText = await response.text();
+                showToast('تأكد من صحة الرصيد في حساب Vectorizer.ai', 'error');
+                console.error('API Error:', errorText);
+                resetUpload();
+            }
+        } catch (error) {
+            showToast('خطأ في الاتصال بالبروكسي أو السيرفر', 'error');
+            console.error('Fetch Error:', error);
+            resetUpload();
+        }
+    }, 'image/png');
 }
 
 // ============================================
@@ -277,7 +256,7 @@ function showResult() {
 }
 
 // ============================================
-// تحميل ومشاركة SVG
+// تحميل ومشاركة
 // ============================================
 function downloadSVG() {
     const blob = new Blob([currentSVG], { type: 'image/svg+xml;charset=utf-8' });
@@ -316,13 +295,7 @@ function resetUpload() {
 // ============================================
 function saveToGallery(original, svg) {
     let gallery = JSON.parse(localStorage.getItem('vectorGallery') || '[]');
-    gallery.unshift({
-        id: Date.now(),
-        original: original,
-        svg: svg,
-        settings: { ...settings },
-        date: new Date().toISOString()
-    });
+    gallery.unshift({ id: Date.now(), original: original, svg: svg, settings: { ...settings }, date: new Date().toISOString() });
     gallery = gallery.slice(0, 20);
     localStorage.setItem('vectorGallery', JSON.stringify(gallery));
 }
@@ -337,9 +310,7 @@ function openGallery() {
         grid.innerHTML = gallery.map(item => `
             <div class="gallery-item" onclick="loadFromGallery(${item.id})">
                 <img src="${item.original}" alt="Image">
-                <div class="select-overlay">
-                    <i class="fas fa-check-circle"></i>
-                </div>
+                <div class="select-overlay"><i class="fas fa-check-circle"></i></div>
             </div>
         `).join('');
     }
@@ -364,75 +335,15 @@ function loadFromGallery(id) {
 }
 
 // ============================================
-// تحميل من رابط
+// أدوات مساعدة
 // ============================================
-function loadFromUrl() {
-    const url = document.getElementById('imageUrl').value.trim();
-    if (!url) {
-        showToast('الرجاء إدخال رابط صحيح', 'error');
-        return;
-    }
-    
-    showProcessing();
-    
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = function() {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        originalImage = canvas.toDataURL('image/png');
-        
-        simulateProgress(() => {
-            convertToVector(img);
-        });
-    };
-    img.onerror = function() {
-        showToast('فشل تحميل الصورة من الرابط', 'error');
-        resetUpload();
-    };
-    img.src = url;
-}
-
-// ============================================
-// API & Tools
-// ============================================
-function generateApiKey() {
-    const key = 'vmk_' + Array.from(crypto.getRandomValues(new Uint8Array(24)))
-        .map(b => b.toString(16).padStart(2, '0')).join('');
-    document.getElementById('apiKey').value = key;
-    showToast('تم إنشاء مفتاح API جديد!', 'success');
-}
-
-function copyApiKey() {
-    const input = document.getElementById('apiKey');
-    if (input.value) {
-        navigator.clipboard.writeText(input.value).then(() => {
-            showToast('تم نسخ مفتاح API!', 'success');
-        });
-    } else {
-        showToast('قم بإنشاء مفتاح API أولاً', 'error');
-    }
-}
-
-function openApiSection() {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    document.querySelector('[data-tab="api"]').classList.add('active');
-    document.getElementById('api-tab').classList.add('active');
-}
-
 function showToast(message, type = 'success') {
     const toast = document.getElementById('toast');
     const toastMessage = document.getElementById('toastMessage');
     const icon = toast.querySelector('i');
-    
     toastMessage.textContent = message;
     toast.className = 'toast ' + type;
     icon.className = type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle';
-    
     toast.classList.add('show');
     setTimeout(() => { toast.classList.remove('show'); }, 3000);
 }
@@ -441,9 +352,15 @@ document.getElementById('galleryModal').addEventListener('click', function(e) {
     if (e.target === this) closeGallery();
 });
 
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closeGallery();
-});
+function openApiSection() {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelector('[data-tab="api"]').classList.add('active');
+    document.getElementById('api-tab').classList.add('active');
+}
 
-console.log('%c VectorMagic Pro v2.0 ', 'background: linear-gradient(135deg, #6366f1, #ec4899); color: white; font-size: 20px; padding: 10px; border-radius: 5px;');
-console.log('%c تصميم: الأستاذ عمر سنجق ', 'color: #6366f1; font-size: 14px;');
+function generateApiKey() { showToast('هذه واجهة تجريبية، مفاتيح Vectorizer.ai مدمجة بالفعل في النظام.', 'error'); }
+function copyApiKey() { showToast('لا يوجد مفتاح للنسخ.', 'error'); }
+
+console.log('%c VectorMagic Pro v3.0 (AI Powered) ', 'background: linear-gradient(135deg, #6366f1, #ec4899); color: white; font-size: 20px; padding: 10px; border-radius: 5px;');
+console.log('%c تصميم وتطوير: الأستاذ عمر السيد ', 'color: #6366f1; font-size: 14px;');
